@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -48,6 +49,9 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, "Error decoding json", http.StatusInternalServerError)
 		}
+
+		s, err := ioutil.ReadAll(r.Body)
+		log.Printf("Body: %s", s)
 
 		w.Header().Set("Content-Type", "application/json")
 		user, err := getCurrentUser(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
