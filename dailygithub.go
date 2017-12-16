@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/andygrunwald/go-trending"
 )
 
 type User struct {
@@ -19,6 +21,11 @@ type User struct {
 
 type FulfillmentReq struct {
 	OriginalRequest OriginalReq `json:"originalRequest,omitempty"`
+	Result          ResultReq   `json:"result,omitempty"`
+}
+
+type ResultReq struct {
+	Action string `json:"action,omitempty"`
 }
 
 type OriginalReq struct {
@@ -41,6 +48,14 @@ type UserReq struct {
 	UserId      string `json:"userId,omitempty"`
 }
 
+type Trending struct {
+	str string
+}
+
+type Fulfillment interface {
+	buildFulfillment() *FulfillmentResp
+}
+
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		decoder := json.NewDecoder(r.Body)
@@ -54,12 +69,26 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Body: %s", s)
 
 		w.Header().Set("Content-Type", "application/json")
-		user, err := getCurrentUser(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
-		if err != nil {
-			log.Println(err)
+
+		var fulfillmentResp *FulfillmentResp
+
+		if fulfillmentReq.Result.Action == "summary_intent" {
+			user, err := getCurrentUser(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
+			if err != nil {
+				log.Println(err)
+			}
+
+			fulfillmentResp = user.buildFulfillment()
+
+		} else if fulfillmentReq.Result.Action == "hot_repo_intent" {
+			hotRepos, err := getTrending()
+			if err != nil {
+				http.Error(w, "Error getting trending repos", http.StatusInternalServerError)
+			}
+
+			fulfillmentResp = hotRepos.buildFulfillment()
 		}
 
-		fulfillmentResp := buildFulfillment(user)
 		resp, err := json.Marshal(fulfillmentResp)
 		if err != nil {
 			http.Error(w, "Error marshaling json", http.StatusInternalServerError)
@@ -71,7 +100,26 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, world")
 }
 
-func buildFulfillment(user *User) *FulfillmentResp {
+func getTrending() (*Trending, error) {
+	trend := trending.NewTrending()
+	projects, err := trend.GetProjects(trending.TimeToday, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var projectText string
+
+	for index, project := range projects {
+		if index > 4 {
+			break // Only take first 5
+		}
+		projectText += fmt.Sprintf("\n#%d. %s by %s: %s", index+1, project.Name, project.Owner, project.Description)
+	}
+
+	return &Trending{projectText}, nil
+}
+
+func (user *User) buildFulfillment() *FulfillmentResp {
 	summary := fmt.Sprintf(
 		"Hello %s. You currently have %d public repos, "+
 			"%d private repos, and you own %d of these private repos."+
@@ -79,6 +127,11 @@ func buildFulfillment(user *User) *FulfillmentResp {
 		user.Name, user.PublicRepos, user.TotalPrivateRepos,
 		user.OwnedPrivateRepos, user.Followers, user.Following)
 	resp := &FulfillmentResp{Speech: summary, DisplayText: summary}
+	return resp
+}
+
+func (trending *Trending) buildFulfillment() *FulfillmentResp {
+	resp := &FulfillmentResp{Speech: trending.str, DisplayText: trending.str}
 	return resp
 }
 
