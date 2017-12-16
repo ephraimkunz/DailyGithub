@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -12,18 +13,20 @@ type Test struct {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Headers: %v", r.Header)
+
 	if r.Method == "POST" {
-		decoder := json.NewDecoder(r.Body)
-		var t Test
-		err := decoder.Decode(&t)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("Request:\n\tbody: %+v\n\theaders: %v", t, r.Header)
+		b, err := ioutil.ReadAll(r.Body)
+		defer r.Body.Close()
+		log.Printf("Body: %s", string(b))
 
 		w.Header().Set("Content-Type", "application/json")
 		test := getResponse()
 		item, err := json.Marshal(test)
+		if err != nil {
+			http.Error(w, "Error marshaling json", http.StatusInternalServerError)
+		}
+
 		w.Write(item)
 		return
 	}
