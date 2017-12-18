@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
 
 	"github.com/andygrunwald/go-trending"
 	"github.com/google/go-github/github"
@@ -13,8 +14,10 @@ import (
 )
 
 const (
-	SummaryIntent  = "summary_intent"
-	TopReposIntent = "hot_repo_intent"
+	SummaryIntent        = "input.summary"
+	TrendingReposIntent  = "input.trending"
+	NotificationsIntent  = "input.notifications"
+	AssignedIssuesIntent = "input.assigned_issues"
 )
 
 type GithubUser github.User
@@ -58,6 +61,7 @@ type FulfillmentBuilder interface {
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
+		debug(httputil.DumpRequest(r, true))
 		decoder := json.NewDecoder(r.Body)
 		fulfillmentReq := &FulfillmentReq{}
 		err := decoder.Decode(fulfillmentReq)
@@ -70,10 +74,16 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 		var builder FulfillmentBuilder
 
-		if fulfillmentReq.Result.Action == SummaryIntent {
+		switch fulfillmentReq.Result.Action {
+		case SummaryIntent:
 			builder, err = getCurrentUser(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
-		} else if fulfillmentReq.Result.Action == TopReposIntent {
+		case TrendingReposIntent:
 			builder, err = getTrending()
+		case NotificationsIntent:
+		case AssignedIssuesIntent:
+		default:
+			http.Error(w, "Incorrect fullfillment action", http.StatusInternalServerError)
+			return
 		}
 
 		if err != nil {
@@ -94,6 +104,14 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func debug(data []byte, err error) {
+	if err == nil {
+		log.Println("Request", string(data))
+	} else {
+		log.Println(err)
+	}
+}
+
 func getTrending() (FulfillmentBuilder, error) {
 	trend := trending.NewTrending()
 	projects, err := trend.GetProjects(trending.TimeToday, "")
@@ -107,7 +125,7 @@ func getTrending() (FulfillmentBuilder, error) {
 		if index > 4 {
 			break // Only take first 5
 		}
-		projectText += fmt.Sprintf("\n#%d. %s by %s: %s", index+1, project.Name, project.Owner, project.Description)
+		projectText += fmt.Sprintf("\n#%d. %s by %s: %s", index+1, project.RepositoryName, project.Owner, project.Description)
 	}
 
 	return &Trending{projectText}, nil
