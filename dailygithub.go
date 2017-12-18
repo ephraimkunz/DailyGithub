@@ -20,7 +20,13 @@ const (
 	AssignedIssuesIntent = "input.assigned_issues"
 )
 
-type GithubUser github.User
+// Create new types so we can make them conform to FulfillmentBuilder
+type GithubNotifications []*github.Notification
+type GithubIssues []*github.Issue
+
+type ProfileSummary struct {
+	user *github.User
+}
 
 type FulfillmentReq struct {
 	OriginalRequest OriginalReq `json:"originalRequest,omitempty"`
@@ -76,11 +82,13 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 		switch fulfillmentReq.Result.Action {
 		case SummaryIntent:
-			builder, err = getCurrentUser(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
+			builder, err = getProfileSummary(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
 		case TrendingReposIntent:
 			builder, err = getTrending()
 		case NotificationsIntent:
+			builder, err = getNotifications(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
 		case AssignedIssuesIntent:
+			builder, err = getAssignedIssues(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
 		default:
 			http.Error(w, "Incorrect fullfillment action", http.StatusInternalServerError)
 			return
@@ -131,13 +139,13 @@ func getTrending() (FulfillmentBuilder, error) {
 	return &Trending{projectText}, nil
 }
 
-func (user *GithubUser) buildFulfillment() *FulfillmentResp {
+func (sum *ProfileSummary) buildFulfillment() *FulfillmentResp {
 	summary := fmt.Sprintf(
 		"Hello %s. You currently have %d public repos, "+
 			"%d private repos, and you own %d of these private repos."+
 			"You have %d followers and are following %d people.",
-		*user.Name, *user.PublicRepos, *user.TotalPrivateRepos,
-		*user.OwnedPrivateRepos, *user.Followers, *user.Following)
+		sum.user.GetName(), sum.user.GetPublicRepos(), sum.user.GetTotalPrivateRepos(),
+		sum.user.GetOwnedPrivateRepos(), sum.user.GetFollowers(), sum.user.GetFollowing())
 	resp := &FulfillmentResp{Speech: summary, DisplayText: summary}
 	log.Println("Built fulfillment with string ", summary)
 	return resp
@@ -149,7 +157,47 @@ func (trending *Trending) buildFulfillment() *FulfillmentResp {
 	return resp
 }
 
-func getCurrentUser(accessToken string) (FulfillmentBuilder, error) {
+func (not *GithubNotifications) buildFulfillment() *FulfillmentResp {
+	var str string
+	for i, notification := range []*github.Notification(*not) {
+		str += fmt.Sprintf("\n#%d: This notification is on an %s and says: %s", i+1, notification.Subject.GetType(), notification.Subject.GetTitle())
+	}
+	return &FulfillmentResp{str, str}
+}
+
+func (iss *GithubIssues) buildFulfillment() *FulfillmentResp {
+	var str string
+	for i, issue := range []*github.Issue(*iss) {
+		str += fmt.Sprintf("\n#%d: Opened in %s repository on %s by %s: %s", i+1, issue.Repository.GetName(), issue.GetCreatedAt(), issue.User.GetLogin(), issue.GetTitle())
+	}
+	return &FulfillmentResp{str, str}
+}
+
+func getNotifications(accessToken string) (FulfillmentBuilder, error) {
+	client, ctx := createGithubClient(accessToken)
+	notifications, _, err := client.Activity.ListNotifications(ctx, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	ghNot := GithubNotifications(notifications)
+	return &ghNot, nil
+}
+
+func getAssignedIssues(accessToken string) (FulfillmentBuilder, error) {
+	client, ctx := createGithubClient(accessToken)
+	issues, _, err := client.Issues.List(ctx, true, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	iss := GithubIssues(issues)
+	return &iss, nil
+}
+
+func getProfileSummary(accessToken string) (FulfillmentBuilder, error) {
 	client, ctx := createGithubClient(accessToken)
 	user, _, err := client.Users.Get(ctx, "") // Get authenticated user
 
@@ -157,9 +205,9 @@ func getCurrentUser(accessToken string) (FulfillmentBuilder, error) {
 		return nil, err
 	}
 
-	githubUser := GithubUser(*user) // Type conversion to custom type so we can use buildFulfillment method
+	summary := &ProfileSummary{user} // Type conversion to custom type so we can use buildFulfillment method
 
-	return &githubUser, nil
+	return summary, nil
 }
 
 func createGithubClient(accessToken string) (*github.Client, context.Context) {
