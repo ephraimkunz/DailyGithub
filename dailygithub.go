@@ -1,23 +1,23 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 
 	"github.com/andygrunwald/go-trending"
+	"github.com/google/go-github/github"
+	"golang.org/x/oauth2"
 )
 
-type User struct {
-	Name              string `json:"name,omitempty"`
-	PublicRepos       int    `json:"public_repos,omitempty"`
-	Followers         int    `json:"followers,omitempty"`
-	Following         int    `json:"following,omitempty"`
-	TotalPrivateRepos int    `json:"total_private_repos,omitempty"`
-	OwnedPrivateRepos int    `json:"owned_private_repos,omitempty"`
-}
+const (
+	SummaryIntent  = "summary_intent"
+	TopReposIntent = "hot_repo_intent"
+)
+
+type GithubUser github.User
 
 type FulfillmentReq struct {
 	OriginalRequest OriginalReq `json:"originalRequest,omitempty"`
@@ -52,55 +52,49 @@ type Trending struct {
 	str string
 }
 
-type Fulfillment interface {
+type FulfillmentBuilder interface {
 	buildFulfillment() *FulfillmentResp
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
+	if r.Method == http.MethodPost {
 		decoder := json.NewDecoder(r.Body)
 		fulfillmentReq := &FulfillmentReq{}
 		err := decoder.Decode(fulfillmentReq)
 		if err != nil {
-			http.Error(w, "Error decoding json", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-
-		s, err := ioutil.ReadAll(r.Body)
-		log.Printf("Body: %s", s)
 
 		w.Header().Set("Content-Type", "application/json")
 
-		var fulfillmentResp *FulfillmentResp
+		var builder FulfillmentBuilder
 
-		if fulfillmentReq.Result.Action == "summary_intent" {
-			user, err := getCurrentUser(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
-			if err != nil {
-				log.Println(err)
-			}
-
-			fulfillmentResp = user.buildFulfillment()
-
-		} else if fulfillmentReq.Result.Action == "hot_repo_intent" {
-			hotRepos, err := getTrending()
-			if err != nil {
-				http.Error(w, "Error getting trending repos", http.StatusInternalServerError)
-			}
-
-			fulfillmentResp = hotRepos.buildFulfillment()
+		if fulfillmentReq.Result.Action == SummaryIntent {
+			builder, err = getCurrentUser(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
+		} else if fulfillmentReq.Result.Action == TopReposIntent {
+			builder, err = getTrending()
 		}
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		fulfillmentResp := builder.buildFulfillment()
 
 		resp, err := json.Marshal(fulfillmentResp)
 		if err != nil {
-			http.Error(w, "Error marshaling json", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		w.Write(resp)
-		return
+	} else if r.Method == http.MethodGet {
+		fmt.Fprintf(w, "Hello, world")
 	}
-
-	fmt.Fprintf(w, "Hello, world")
 }
 
-func getTrending() (*Trending, error) {
+func getTrending() (FulfillmentBuilder, error) {
 	trend := trending.NewTrending()
 	projects, err := trend.GetProjects(trending.TimeToday, "")
 	if err != nil {
@@ -119,47 +113,43 @@ func getTrending() (*Trending, error) {
 	return &Trending{projectText}, nil
 }
 
-func (user *User) buildFulfillment() *FulfillmentResp {
+func (user *GithubUser) buildFulfillment() *FulfillmentResp {
 	summary := fmt.Sprintf(
 		"Hello %s. You currently have %d public repos, "+
 			"%d private repos, and you own %d of these private repos."+
 			"You have %d followers and are following %d people.",
-		user.Name, user.PublicRepos, user.TotalPrivateRepos,
-		user.OwnedPrivateRepos, user.Followers, user.Following)
+		*user.Name, *user.PublicRepos, *user.TotalPrivateRepos,
+		*user.OwnedPrivateRepos, *user.Followers, *user.Following)
 	resp := &FulfillmentResp{Speech: summary, DisplayText: summary}
+	log.Println("Built fulfillment with string ", summary)
 	return resp
 }
 
 func (trending *Trending) buildFulfillment() *FulfillmentResp {
 	resp := &FulfillmentResp{Speech: trending.str, DisplayText: trending.str}
+	log.Println("Built fulfillment with string ", trending.str)
 	return resp
 }
 
-func getCurrentUser(accessToken string) (*User, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
+func getCurrentUser(accessToken string) (FulfillmentBuilder, error) {
+	client, ctx := createGithubClient(accessToken)
+	user, _, err := client.Users.Get(ctx, "") // Get authenticated user
 
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "token "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	githubUser := GithubUser(*user) // Type conversion to custom type so we can use buildFulfillment method
 
-	if err != nil {
-		return nil, err
-	}
+	return &githubUser, nil
+}
 
-	decoder := json.NewDecoder(resp.Body)
-	user := &User{}
-
-	err = decoder.Decode(user)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+func createGithubClient(accessToken string) (*github.Client, context.Context) {
+	ctx := context.Background()
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: accessToken})
+	tc := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(tc)
+	return client, ctx
 }
 
 func main() {
