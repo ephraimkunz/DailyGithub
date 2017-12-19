@@ -98,7 +98,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 		case SummaryIntent:
 			builder, err = getProfileSummary(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
 		case TrendingReposIntent:
-			if i, err := strconv.Atoi(fulfillmentReq.Result.Parameters.Number); err != nil && i != 0 {
+			if i, err := strconv.Atoi(fulfillmentReq.Result.Parameters.Number); err == nil && i != 0 {
 				builder, err = getTrending(&i)
 			} else {
 				builder, err = getTrending(nil)
@@ -154,7 +154,7 @@ func getTrending(count *int) (FulfillmentBuilder, error) {
 		maxTrending = *count
 	}
 
-	projectText = fmt.Sprintf("<p>Here are the top %d trending repositories:</p>", minInt(len(projects), maxTrending))
+	projectSpeech = fmt.Sprintf("<p>Here are the top %d trending repositories:</p>", minInt(len(projects), maxTrending))
 	for index, project := range projects {
 		if index >= maxTrending {
 			break
@@ -179,7 +179,7 @@ func (sum *ProfileSummary) buildFulfillment() *FulfillmentResp {
 }
 
 func (trending *Trending) buildFulfillment() *FulfillmentResp {
-	resp := &FulfillmentResp{Speech: trending.speech, DisplayText: trending.text}
+	resp := &FulfillmentResp{Speech: "<speak>" + trending.speech + "</speak>", DisplayText: trending.text}
 	log.Println("Built fulfillment with string ", trending.speech)
 	return resp
 }
@@ -187,7 +187,7 @@ func (trending *Trending) buildFulfillment() *FulfillmentResp {
 func (not *GithubNotifications) buildFulfillment() *FulfillmentResp {
 	var text, speech string
 	if len([]*github.Notification(*not)) > 0 {
-		speech = "<p>Here are your unread notifications:</p>"
+		speech = "<speak><p>Here are your unread notifications:</p>"
 	} else {
 		speech = "You have no unread notifications"
 	}
@@ -196,13 +196,13 @@ func (not *GithubNotifications) buildFulfillment() *FulfillmentResp {
 		text += fmt.Sprintf("\n#%d: This notification is on an %s and says: %s", i+1, notification.Subject.GetType(), notification.Subject.GetTitle())
 		speech += fmt.Sprintf("<p>#%d: This notification is on an %s and says: %s</p>", i+1, notification.Subject.GetType(), notification.Subject.GetTitle())
 	}
-	return &FulfillmentResp{speech, text}
+	return &FulfillmentResp{speech + "</speak>", text}
 }
 
 func (iss *GithubIssues) buildFulfillment() *FulfillmentResp {
 	var text, speech string
 	if len([]*github.Issue(*iss)) > 0 {
-		speech = fmt.Sprintf("<p>Here are the open issues assigned to you:</p>")
+		speech = fmt.Sprintf("<speak><p>Here are the open issues assigned to you:</p>")
 	} else {
 		speech = fmt.Sprintf("You have no open issues assigned to you.")
 	}
@@ -211,7 +211,7 @@ func (iss *GithubIssues) buildFulfillment() *FulfillmentResp {
 		text += fmt.Sprintf("\n#%d: Opened in %s on %s by %s: %s", i+1, issue.Repository.GetName(), issue.GetCreatedAt().Format("Monday, January 2"), issue.User.GetLogin(), issue.GetTitle())
 		speech += fmt.Sprintf("<p>#%d: Opened in %s on %s by %s: %s</p>", i+1, issue.Repository.GetName(), issue.GetCreatedAt().Format("Monday, January 2"), issue.User.GetLogin(), issue.GetTitle())
 	}
-	return &FulfillmentResp{speech, text}
+	return &FulfillmentResp{speech + "</speak>", text}
 }
 
 func getNotifications(accessToken string) (FulfillmentBuilder, error) {
