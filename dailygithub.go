@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 
 	"github.com/andygrunwald/go-trending"
 	"github.com/google/go-github/github"
@@ -18,6 +19,7 @@ const (
 	TrendingReposIntent  = "input.trending"
 	NotificationsIntent  = "input.notifications"
 	AssignedIssuesIntent = "input.assigned_issues"
+	defaultTrendingRepos = 5
 )
 
 // Create new types so we can make them conform to FulfillmentBuilder
@@ -34,7 +36,12 @@ type FulfillmentReq struct {
 }
 
 type ResultReq struct {
-	Action string `json:"action,omitempty"`
+	Action     string        `json:"action,omitempty"`
+	Parameters ParametersReq `json:"parameters,omitempty"`
+}
+
+type ParametersReq struct {
+	Number string `json:"number,omitempty"`
 }
 
 type OriginalReq struct {
@@ -84,7 +91,11 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 		case SummaryIntent:
 			builder, err = getProfileSummary(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
 		case TrendingReposIntent:
-			builder, err = getTrending()
+			if i, err := strconv.Atoi(fulfillmentReq.Result.Parameters.Number); err != nil && i != 0 {
+				builder, err = getTrending(&i)
+			} else {
+				builder, err = getTrending(nil)
+			}
 		case NotificationsIntent:
 			builder, err = getNotifications(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
 		case AssignedIssuesIntent:
@@ -120,7 +131,8 @@ func debug(data []byte, err error) {
 	}
 }
 
-func getTrending() (FulfillmentBuilder, error) {
+// Count may be nil if the user didn't specify how many. Give them the default value.
+func getTrending(count *int) (FulfillmentBuilder, error) {
 	trend := trending.NewTrending()
 	projects, err := trend.GetProjects(trending.TimeToday, "")
 	if err != nil {
@@ -128,10 +140,16 @@ func getTrending() (FulfillmentBuilder, error) {
 	}
 
 	var projectText string
+	var maxTrending int
+	if count == nil {
+		maxTrending = defaultTrendingRepos
+	} else {
+		maxTrending = *count
+	}
 
 	for index, project := range projects {
-		if index > 4 {
-			break // Only take first 5
+		if index >= maxTrending {
+			break
 		}
 		projectText += fmt.Sprintf("\n#%d. %s by %s: %s", index+1, project.RepositoryName, project.Owner, project.Description)
 	}
