@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
+	_ "net/http/pprof"
 	"strconv"
 
 	"github.com/andygrunwald/go-trending"
