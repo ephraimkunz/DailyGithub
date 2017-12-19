@@ -168,7 +168,7 @@ func (not *GithubNotifications) buildFulfillment() *FulfillmentResp {
 func (iss *GithubIssues) buildFulfillment() *FulfillmentResp {
 	var str string
 	for i, issue := range []*github.Issue(*iss) {
-		str += fmt.Sprintf("\n#%d: Opened in %s repository on %s by %s: %s", i+1, issue.Repository.GetName(), issue.GetCreatedAt(), issue.User.GetLogin(), issue.GetTitle())
+		str += fmt.Sprintf("\n#%d: Opened in %s on %s by %s: %s", i+1, issue.Repository.GetName(), issue.GetCreatedAt().Format("Monday, January 2"), issue.User.GetLogin(), issue.GetTitle())
 	}
 	return &FulfillmentResp{str, str}
 }
