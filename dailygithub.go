@@ -190,7 +190,7 @@ func (not *GithubNotifications) buildFulfillment() *FulfillmentResp {
 	if len([]*github.Notification(*not)) > 0 {
 		speech = "<speak><p>Here are your unread notifications:</p>"
 	} else {
-		speech = "You have no unread notifications"
+		speech = "<speak>You have no unread notifications"
 	}
 
 	for i, notification := range []*github.Notification(*not) {
@@ -205,7 +205,7 @@ func (iss *GithubIssues) buildFulfillment() *FulfillmentResp {
 	if len([]*github.Issue(*iss)) > 0 {
 		speech = fmt.Sprintf("<speak><p>Here are the open issues assigned to you:</p>")
 	} else {
-		speech = fmt.Sprintf("You have no open issues assigned to you.")
+		speech = fmt.Sprintf("<speak>You have no open issues assigned to you.")
 	}
 
 	for i, issue := range []*github.Issue(*iss) {
