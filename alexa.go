@@ -25,8 +25,13 @@ type AlexaIntent struct {
 }
 
 type AlexaSlots struct {
-	Number string `json:"number,omitempty"`
-	Lang   string `json:"lang,omitempty"`
+	Number AlexaSlot `json:"number,omitempty"`
+	Lang   AlexaSlot `json:"lang,omitempty"`
+}
+
+type AlexaSlot struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 type AlexaSession struct {
@@ -80,10 +85,10 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 			builder, err = getProfileSummary(alexaReq.Session.User.AccessToken)
 		case TrendingReposIntent:
 
-			if i, err := strconv.Atoi(alexaReq.Request.Intent.Slots.Number); err == nil && i != 0 {
-				builder, err = getTrending(&i, extractLang(alexaReq.Request.Intent.Slots.Lang))
+			if i, err := strconv.Atoi(alexaReq.Request.Intent.Slots.Number.Value); err == nil && i != 0 {
+				builder, err = getTrending(&i, extractLang(alexaReq.Request.Intent.Slots.Lang.Value))
 			} else {
-				builder, err = getTrending(nil, extractLang(alexaReq.Request.Intent.Slots.Lang))
+				builder, err = getTrending(nil, extractLang(alexaReq.Request.Intent.Slots.Lang.Value))
 			}
 		case NotificationsIntent:
 			builder, err = getNotifications(alexaReq.Session.User.AccessToken)
