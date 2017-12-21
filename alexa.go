@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strconv"
+	"strings"
 )
 
 const AlexaVersion = "1.0"
@@ -104,9 +105,10 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fulfillmentResp := builder.buildFulfillment()
+		str := builder.buildFulfillment().Speech
+		str = strings.Replace(str, "&", "and", -1) // Alexa won't read ssml with '&' in it
 
-		alexaResp := NewAlexaResponse(fulfillmentResp.Speech)
+		alexaResp := NewAlexaResponse(str)
 
 		resp, err := json.Marshal(alexaResp)
 		if err != nil {
