@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	_ "net/http/pprof"
 	"strconv"
+	"strings"
 
 	"github.com/andygrunwald/go-trending"
 	"github.com/google/go-github/github"
@@ -43,6 +44,7 @@ type ResultReq struct {
 
 type ParametersReq struct {
 	Number string `json:"number,omitempty"`
+	Lang   string `json:"lang,omitempty"`
 }
 
 type OriginalReq struct {
@@ -80,6 +82,26 @@ func minInt(x, y int) int {
 	return y
 }
 
+func extractLang(fr *FulfillmentReq) string {
+	trend := trending.NewTrending()
+	langs, err := trend.GetLanguages()
+	if err != nil {
+		return ""
+	}
+
+	if fr.Result.Parameters.Lang == "" {
+		return ""
+	}
+
+	for _, trendLang := range langs {
+		if strings.ToLower(trendLang.Name) == fr.Result.Parameters.Lang {
+			return trendLang.URLName
+		}
+	}
+
+	return ""
+}
+
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		debug(httputil.DumpRequest(r, true))
@@ -99,10 +121,11 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 		case SummaryIntent:
 			builder, err = getProfileSummary(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
 		case TrendingReposIntent:
+
 			if i, err := strconv.Atoi(fulfillmentReq.Result.Parameters.Number); err == nil && i != 0 {
-				builder, err = getTrending(&i)
+				builder, err = getTrending(&i, extractLang(fulfillmentReq))
 			} else {
-				builder, err = getTrending(nil)
+				builder, err = getTrending(nil, extractLang(fulfillmentReq))
 			}
 		case NotificationsIntent:
 			builder, err = getNotifications(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
@@ -140,9 +163,9 @@ func debug(data []byte, err error) {
 }
 
 // Count may be nil if the user didn't specify how many. Give them the default value.
-func getTrending(count *int) (FulfillmentBuilder, error) {
+func getTrending(count *int, lang string) (FulfillmentBuilder, error) {
 	trend := trending.NewTrending()
-	projects, err := trend.GetProjects(trending.TimeToday, "")
+	projects, err := trend.GetProjects(trending.TimeToday, lang)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +178,12 @@ func getTrending(count *int) (FulfillmentBuilder, error) {
 		maxTrending = *count
 	}
 
-	projectSpeech = fmt.Sprintf("<p>Here are the top %d trending repositories:</p>", minInt(len(projects), maxTrending))
+	if lang != "" {
+		projectSpeech = fmt.Sprintf("<p>Here are the top %d trending repositories for %s:</p>", minInt(len(projects), maxTrending), lang)
+	} else {
+		projectSpeech = fmt.Sprintf("<p>Here are the top %d trending repositories:</p>", minInt(len(projects), maxTrending))
+	}
+
 	for index, project := range projects {
 		if index >= maxTrending {
 			break
