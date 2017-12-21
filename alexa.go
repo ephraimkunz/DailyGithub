@@ -9,7 +9,29 @@ import (
 	"strings"
 )
 
-const AlexaVersion = "1.0"
+const (
+	AlexaVersion = "1.0"
+
+	AlexaIntentTypeIntent       = "IntentRequest"
+	AlexaIntentTypeLaunch       = "LaunchRequest"
+	AlexaIntentTypeSessionEnded = "SessionEndedRequest"
+
+	AlexaHelpIntent   = "AMAZON.HelpIntent"
+	AlexaCancelIntent = "AMAZON.CancelIntent"
+	AlexaStopIntent   = "AMAZON.StopIntent"
+
+	HelpText    = "You can ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you."
+	WelcomeText = "Welcome to DailyGithub! Let's get started. Ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you."
+)
+
+// Make a string have the buildFulfillment method
+type AlexaStringResponse string
+
+func (strResp *AlexaStringResponse) buildFulfillment() *FulfillmentResp {
+	str := string(*strResp)
+	fr := &FulfillmentResp{str, str}
+	return fr
+}
 
 type AlexaRequest struct {
 	Session AlexaSession        `json:"session,omitempty"`
@@ -17,6 +39,7 @@ type AlexaRequest struct {
 }
 
 type AlexaRequestDetails struct {
+	Type   string      `json:"type,omitempty"`
 	Intent AlexaIntent `json:"intent,omitempty"`
 }
 
@@ -81,6 +104,18 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 
 		var builder FulfillmentBuilder
 
+		// This is how Alexa handles the "welcome" intent
+		if alexaReq.Request.Type == AlexaIntentTypeLaunch {
+			resp := NewAlexaResponse(WelcomeText)
+			jsonResp, err := json.Marshal(resp)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Write(jsonResp)
+			return
+		}
+
 		switch alexaReq.Request.Intent.Name {
 		case SummaryIntent:
 			builder, err = getProfileSummary(alexaReq.Session.User.AccessToken)
@@ -95,6 +130,12 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 			builder, err = getNotifications(alexaReq.Session.User.AccessToken)
 		case AssignedIssuesIntent:
 			builder, err = getAssignedIssues(alexaReq.Session.User.AccessToken)
+		case AlexaHelpIntent:
+			resp := AlexaStringResponse(HelpText)
+			builder, err = &resp, nil
+		case AlexaCancelIntent, AlexaStopIntent:
+			resp := AlexaStringResponse("") // Just stop whatever is going on
+			builder, err = &resp, nil
 		default:
 			http.Error(w, "Incorrect fullfillment action", http.StatusInternalServerError)
 			return
