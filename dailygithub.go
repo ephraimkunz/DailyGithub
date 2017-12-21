@@ -2,13 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	_ "net/http/pprof"
-	"strconv"
 	"strings"
 
 	"github.com/andygrunwald/go-trending"
@@ -82,76 +79,24 @@ func minInt(x, y int) int {
 	return y
 }
 
-func extractLang(fr *FulfillmentReq) string {
+func extractLang(lang string) string {
 	trend := trending.NewTrending()
 	langs, err := trend.GetLanguages()
 	if err != nil {
 		return ""
 	}
 
-	if fr.Result.Parameters.Lang == "" {
+	if lang == "" {
 		return ""
 	}
 
 	for _, trendLang := range langs {
-		if strings.ToLower(trendLang.Name) == fr.Result.Parameters.Lang {
+		if strings.ToLower(trendLang.Name) == lang {
 			return trendLang.URLName
 		}
 	}
 
 	return ""
-}
-
-func rootHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		debug(httputil.DumpRequest(r, true))
-		decoder := json.NewDecoder(r.Body)
-		fulfillmentReq := &FulfillmentReq{}
-		err := decoder.Decode(fulfillmentReq)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		var builder FulfillmentBuilder
-
-		switch fulfillmentReq.Result.Action {
-		case SummaryIntent:
-			builder, err = getProfileSummary(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
-		case TrendingReposIntent:
-
-			if i, err := strconv.Atoi(fulfillmentReq.Result.Parameters.Number); err == nil && i != 0 {
-				builder, err = getTrending(&i, extractLang(fulfillmentReq))
-			} else {
-				builder, err = getTrending(nil, extractLang(fulfillmentReq))
-			}
-		case NotificationsIntent:
-			builder, err = getNotifications(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
-		case AssignedIssuesIntent:
-			builder, err = getAssignedIssues(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
-		default:
-			http.Error(w, "Incorrect fullfillment action", http.StatusInternalServerError)
-			return
-		}
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		fulfillmentResp := builder.buildFulfillment()
-
-		resp, err := json.Marshal(fulfillmentResp)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write(resp)
-	} else if r.Method == http.MethodGet {
-		fmt.Fprintf(w, "Hello, world")
-	}
 }
 
 func debug(data []byte, err error) {
@@ -289,6 +234,7 @@ func createGithubClient(accessToken string) (*github.Client, context.Context) {
 }
 
 func main() {
-	http.HandleFunc("/", rootHandler)
+	http.HandleFunc("/", assistantHandler)
+	http.HandleFunc("/alexa", alexaHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
