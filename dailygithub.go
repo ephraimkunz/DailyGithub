@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	SummaryIntent        = "input.summary"
-	TrendingReposIntent  = "input.trending"
-	NotificationsIntent  = "input.notifications"
-	AssignedIssuesIntent = "input.assigned_issues"
+	SummaryIntent        = "summary_intent"
+	TrendingReposIntent  = "trending_repos_intent"
+	NotificationsIntent  = "notifications_intent"
+	AssignedIssuesIntent = "assigned_issues_intent"
 	defaultTrendingRepos = 5
 )
 
