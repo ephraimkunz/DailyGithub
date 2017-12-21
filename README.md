@@ -1,6 +1,7 @@
 # DailyGithub 
 [![Build Status](https://travis-ci.org/ephraimkunz/DailyGithub.svg?branch=master)](https://travis-ci.org/ephraimkunz/DailyGithub)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ephraimkunz/DailyGithub)](https://goreportcard.com/report/github.com/ephraimkunz/DailyGithub)
+
 Get your daily Github update from Google Assistant
 
 ## Testing

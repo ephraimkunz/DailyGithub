@@ -40,7 +40,7 @@ func Test_minInt(t *testing.T) {
 	}{
 		{"Test same number doesn't fail", args{5, 5}, 5},
 		{"Test first order", args{5, 4}, 4},
-		{"Test second order", args{4, 5}, 5},
+		{"Test second order", args{4, 5}, 4},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
