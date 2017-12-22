@@ -147,7 +147,7 @@ func (sum *ProfileSummary) buildFulfillment() *FulfillmentResp {
 			"You have %d followers and are following %d people.",
 		sum.user.GetName(), sum.user.GetPublicRepos(), sum.user.GetTotalPrivateRepos(),
 		sum.user.GetOwnedPrivateRepos(), sum.user.GetFollowers(), sum.user.GetFollowing())
-	resp := &FulfillmentResp{Speech: summary, DisplayText: summary}
+	resp := &FulfillmentResp{Speech: "<speak>" + summary + "</speak>", DisplayText: summary}
 	log.Println("Built fulfillment with string ", summary)
 	return resp
 }
@@ -236,5 +236,6 @@ func createGithubClient(accessToken string) (*github.Client, context.Context) {
 func main() {
 	http.HandleFunc("/", assistantHandler)
 	http.HandleFunc("/alexa", alexaHandler)
+	http.HandleFunc("/token", alexaTokenProxyHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

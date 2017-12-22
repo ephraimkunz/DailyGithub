@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
@@ -160,4 +162,41 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		fmt.Fprint(w, "Hello, world alexa")
 	}
+}
+
+// Proxies the get token POST call part of the oauth flow to Github. This is needed because
+// when Alexa requests the token, it doesn't have the Accept: application/json header, causing
+// Github to return the response as a query string. Alexa expects it as JSON. So we do the call against
+// Github after setting the Header, then respond to Alexa with the JSON body we received. Note: Github also
+// expects the client_secret as a query parameter, not a Authorization: Basic <> encoded header.
+// So make sure the checkbox for Credential Authentication Scheme is set to "Credentials in
+// request body" in the Alexa setup console.
+// https://forums.developer.amazon.com/articles/38610/alexa-debugging-account-linking.html
+func alexaTokenProxyHandler(w http.ResponseWriter, r *http.Request) {
+	debug(httputil.DumpRequest(r, true))
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Bad body", http.StatusBadRequest)
+		return
+	}
+
+	newReq, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBuffer(body))
+	newReq.Header.Set("Accept", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(newReq)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	recievedBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Bad response from Github", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(recievedBody)
 }
