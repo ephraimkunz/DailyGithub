@@ -20,8 +20,8 @@ const (
 	AlexaCancelIntent = "AMAZON.CancelIntent"
 	AlexaStopIntent   = "AMAZON.StopIntent"
 
-	HelpText    = "You can ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you."
-	WelcomeText = "Welcome to DailyGithub! Let's get started. Ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you."
+	HelpText    = "<speak>You can ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you.</speak>"
+	WelcomeText = "<speak>Welcome to DailyGithub! Let's get started. Ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you.</speak>"
 )
 
 // Make a string have the buildFulfillment method
@@ -76,8 +76,8 @@ type AlexaResponseDetails struct {
 }
 
 type AlexaOutputSpeech struct {
-	Type string `json:"type,omitempty"`
-	SSML string `json:"ssml,omitempty"`
+	Type string `json:"type"`
+	SSML string `json:"ssml"`
 }
 
 func NewAlexaResponse(ssml string) AlexaResponse {
