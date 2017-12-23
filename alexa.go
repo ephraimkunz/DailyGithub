@@ -18,12 +18,15 @@ const (
 	AlexaIntentTypeLaunch       = "LaunchRequest"
 	AlexaIntentTypeSessionEnded = "SessionEndedRequest"
 
+	AlexaCardTypeLink = "LinkAccount"
+
 	AlexaHelpIntent   = "AMAZON.HelpIntent"
 	AlexaCancelIntent = "AMAZON.CancelIntent"
 	AlexaStopIntent   = "AMAZON.StopIntent"
 
-	HelpText    = "<speak>You can ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you.</speak>"
-	WelcomeText = "<speak>Welcome to DailyGithub! Let's get started. Ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you.</speak>"
+	HelpText         = "<speak>You can ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you.</speak>"
+	WelcomeText      = "<speak>Welcome to DailyGithub! Let's get started. Ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you.</speak>"
+	AuthRequiredText = "<speak>This task requires linking your Github account to this skill.</speak>"
 )
 
 // Make a string have the buildFulfillment method
@@ -74,7 +77,13 @@ type AlexaResponse struct {
 }
 
 type AlexaResponseDetails struct {
-	OutputSpeech AlexaOutputSpeech `json:"outputSpeech,omitempty"`
+	OutputSpeech     AlexaOutputSpeech `json:"outputSpeech,omitempty"`
+	Card             AlexaCard         `json:"card,omitempty"`
+	ShouldEndSession bool              `json:"shouldEndSession,omitempty"`
+}
+
+type AlexaCard struct {
+	Type string `json:"type,omitempty"`
 }
 
 type AlexaOutputSpeech struct {
@@ -88,6 +97,12 @@ func NewAlexaResponse(ssml string) AlexaResponse {
 	ar.Response.OutputSpeech.Type = "SSML"
 	ar.Response.OutputSpeech.SSML = ssml
 	return ar
+}
+
+func requiresAccessToken(name string) bool {
+	return name == SummaryIntent ||
+		name == NotificationsIntent ||
+		name == AssignedIssuesIntent
 }
 
 func alexaHandler(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +124,19 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 		// This is how Alexa handles the "welcome" intent
 		if alexaReq.Request.Type == AlexaIntentTypeLaunch {
 			resp := NewAlexaResponse(WelcomeText)
+			jsonResp, err := json.Marshal(resp)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Write(jsonResp)
+			return
+		}
+
+		// Make sure that access_token is valid if invoking an intent requiring an access token
+		if alexaReq.Session.User.AccessToken == "" && requiresAccessToken(alexaReq.Request.Intent.Name) {
+			resp := NewAlexaResponse(AuthRequiredText)
+			resp.Response.Card.Type = AlexaCardTypeLink
 			jsonResp, err := json.Marshal(resp)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
