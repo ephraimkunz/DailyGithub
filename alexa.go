@@ -106,6 +106,7 @@ func requiresAccessToken(name string) bool {
 }
 
 func alexaHandler(w http.ResponseWriter, r *http.Request) {
+	validateRequest(w, r)
 	switch r.Method {
 	case http.MethodPost:
 		debug(httputil.DumpRequest(r, true))

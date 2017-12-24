@@ -91,7 +91,7 @@ func extractLang(lang string) string {
 	}
 
 	for _, trendLang := range langs {
-		if strings.ToLower(trendLang.Name) == lang {
+		if strings.ToLower(trendLang.Name) == strings.ToLower(lang) {
 			return trendLang.URLName
 		}
 	}

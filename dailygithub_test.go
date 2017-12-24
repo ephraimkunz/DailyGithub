@@ -18,6 +18,7 @@ func Test_extractLang(t *testing.T) {
 		{"Handle language that is not real", args{"fakelanguage"}, ""},
 		{"Handle correct language", args{"go"}, "go"},
 		{"Handle correct language that requires hyphens", args{"apollo guidance computer"}, "apollo-guidance-computer"},
+		{"Handle language with strange capitalization", args{"JavaScript"}, "javascript"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
