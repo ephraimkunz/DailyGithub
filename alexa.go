@@ -78,7 +78,7 @@ type AlexaResponse struct {
 
 type AlexaResponseDetails struct {
 	OutputSpeech     AlexaOutputSpeech `json:"outputSpeech,omitempty"`
-	Card             AlexaCard         `json:"card,omitempty"`
+	Card             *AlexaCard        `json:"card,omitempty"` // Pointer here to omit "card:{}" when empty struct
 	ShouldEndSession bool              `json:"shouldEndSession,omitempty"`
 }
 
@@ -136,7 +136,8 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 		// Make sure that access_token is valid if invoking an intent requiring an access token
 		if alexaReq.Session.User.AccessToken == "" && requiresAccessToken(alexaReq.Request.Intent.Name) {
 			resp := NewAlexaResponse(AuthRequiredText)
-			resp.Response.Card.Type = AlexaCardTypeLink
+			card := AlexaCard{AlexaCardTypeLink}
+			resp.Response.Card = &card
 			jsonResp, err := json.Marshal(resp)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
