@@ -125,6 +125,7 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 		// This is how Alexa handles the "welcome" intent
 		if alexaReq.Request.Type == AlexaIntentTypeLaunch {
 			resp := NewAlexaResponse(WelcomeText)
+			resp.Response.ShouldEndSession = false
 			jsonResp, err := json.Marshal(resp)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -182,6 +183,9 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 		str = strings.Replace(str, "&", "and", -1) // Alexa won't read ssml with '&' in it
 
 		alexaResp := NewAlexaResponse(str)
+		if alexaReq.Request.Intent.Name == AlexaHelpIntent {
+			alexaResp.Response.ShouldEndSession = false // Session does not end on Launch intent or Help intent
+		}
 
 		resp, err := json.Marshal(alexaResp)
 		if err != nil {
