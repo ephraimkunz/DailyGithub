@@ -79,7 +79,7 @@ type AlexaResponse struct {
 type AlexaResponseDetails struct {
 	OutputSpeech     AlexaOutputSpeech `json:"outputSpeech,omitempty"`
 	Card             *AlexaCard        `json:"card,omitempty"` // Pointer here to omit "card:{}" when empty struct
-	ShouldEndSession bool              `json:"shouldEndSession,omitempty"`
+	ShouldEndSession bool              `json:"shouldEndSession"`
 }
 
 type AlexaCard struct {
@@ -96,6 +96,7 @@ func NewAlexaResponse(ssml string) AlexaResponse {
 	ar.Version = AlexaVersion
 	ar.Response.OutputSpeech.Type = "SSML"
 	ar.Response.OutputSpeech.SSML = ssml
+	ar.Response.ShouldEndSession = true
 	return ar
 }
 
