@@ -29,6 +29,9 @@ const (
 	AuthRequiredText = "<speak>This task requires linking your Github account to this skill.</speak>"
 )
 
+// Per Golang docs, create once and reuse across multiple goroutines
+var client = &http.Client{}
+
 // Make a string have the buildFulfillment method
 type AlexaStringResponse string
 
@@ -219,13 +222,13 @@ func alexaTokenProxyHandler(w http.ResponseWriter, r *http.Request) {
 	newReq, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBuffer(body))
 	newReq.Header.Set("Accept", "application/json")
 
-	client := &http.Client{}
 	resp, err := client.Do(newReq)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	defer resp.Body.Close()
 
 	recievedBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
