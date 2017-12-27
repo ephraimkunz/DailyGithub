@@ -125,12 +125,12 @@ func IsValidAlexaRequest(w http.ResponseWriter, r *http.Request) bool {
 func readCert(certURL string) ([]byte, error) {
 	cert, err := http.Get(certURL)
 	if err != nil {
-		return nil, errors.New("Could not download Amazon cert file.")
+		return nil, errors.New("could not download Amazon cert file")
 	}
 	defer cert.Body.Close()
 	certContents, err := ioutil.ReadAll(cert.Body)
 	if err != nil {
-		return nil, errors.New("Could not read Amazon cert file.")
+		return nil, errors.New("could not read Amazon cert file")
 	}
 
 	return certContents, nil
