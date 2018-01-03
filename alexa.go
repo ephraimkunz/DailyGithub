@@ -210,6 +210,9 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 // So make sure the checkbox for Credential Authentication Scheme is set to "Credentials in
 // request body" in the Alexa setup console.
 // https://forums.developer.amazon.com/articles/38610/alexa-debugging-account-linking.html
+
+// Google makes us use this proxy, but for a different reason. They always pass credentials in the request body.
+// They just want us to own the /token endpoint, so we proxy them to Github too.
 func alexaTokenProxyHandler(w http.ResponseWriter, r *http.Request) {
 	debug(httputil.DumpRequest(r, true))
 

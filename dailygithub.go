@@ -235,6 +235,7 @@ func createGithubClient(accessToken string) (*github.Client, context.Context) {
 
 func main() {
 	http.HandleFunc("/", assistantHandler)
+	http.HandleFunc("/authorize", assistantAuth)
 	http.HandleFunc("/alexa", alexaHandler)
 	http.HandleFunc("/token", alexaTokenProxyHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
