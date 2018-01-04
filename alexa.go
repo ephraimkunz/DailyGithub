@@ -12,18 +12,23 @@ import (
 )
 
 const (
+	// Required in json response
 	AlexaVersion = "1.0"
 
+	// Alexa intent types
 	AlexaIntentTypeIntent       = "IntentRequest"
 	AlexaIntentTypeLaunch       = "LaunchRequest"
 	AlexaIntentTypeSessionEnded = "SessionEndedRequest"
 
+	// Force a link account card to appear in the Alexa app
 	AlexaCardTypeLink = "LinkAccount"
 
+	// Alexa built-in intents we must handle
 	AlexaHelpIntent   = "AMAZON.HelpIntent"
 	AlexaCancelIntent = "AMAZON.CancelIntent"
 	AlexaStopIntent   = "AMAZON.StopIntent"
 
+	// SSML speech constants
 	HelpText         = "<speak>You can ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you.</speak>"
 	WelcomeText      = "<speak>Welcome to DailyGithub! Let's get started. Ask for a summary of your Github profile, a list of trending repos, a list of your notifications, or a list of issues assigned to you.</speak>"
 	AuthRequiredText = "<speak>This task requires linking your Github account to this skill.</speak>"
