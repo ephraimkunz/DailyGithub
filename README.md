@@ -7,7 +7,7 @@ Get your daily Github update from Google Assistant / Amazon Alexa
 ## Live Versions
 Amazon Alexa skill is [here](https://www.amazon.com/dp/B078LHPJWM/ref=sr_1_13?s=digital-skills&ie=UTF8&qid=1514383804&sr=1-13&keywords=github).
 
-Google Assistant skill is in review.
+Google Assistant skill is [here](https://assistant.google.com/services/a/uid/000000c1a6473f2d?hl=en).
 
 ## Testing
 Run `go test` inside the directory root.
