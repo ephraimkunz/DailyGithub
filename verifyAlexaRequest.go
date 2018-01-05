@@ -1,6 +1,6 @@
 /*
 Most of this file comes from https://github.com/mikeflynn/go-alexa. Amazon makes us
-verify that requests to our webservice come from them only.
+verify that requests to our webservice come from them only, so we must check their certs.
 */
 package main
 

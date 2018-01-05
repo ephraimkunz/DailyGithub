@@ -162,7 +162,6 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 		case SummaryIntent:
 			builder, err = getProfileSummary(alexaReq.Session.User.AccessToken)
 		case TrendingReposIntent:
-
 			if i, err := strconv.Atoi(alexaReq.Request.Intent.Slots.Number.Value); err == nil && i != 0 {
 				builder, err = getTrending(&i, extractLang(alexaReq.Request.Intent.Slots.Lang.Value))
 			} else {

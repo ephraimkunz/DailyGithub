@@ -28,7 +28,6 @@ func assistantHandler(w http.ResponseWriter, r *http.Request) {
 		case SummaryIntent:
 			builder, err = getProfileSummary(fulfillmentReq.OriginalRequest.Data.User.AccessToken)
 		case TrendingReposIntent:
-
 			if i, err := strconv.Atoi(fulfillmentReq.Result.Parameters.Number); err == nil && i != 0 {
 				builder, err = getTrending(&i, extractLang(fulfillmentReq.Result.Parameters.Lang))
 			} else {
@@ -71,21 +70,4 @@ func assistantAuth(w http.ResponseWriter, r *http.Request) {
 	url := "https://github.com/login/oauth/authorize" + "?" + r.URL.RawQuery
 	log.Println(url)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-	// newReq, err := http.NewRequest("GET", url, nil)
-
-	// resp, err := client.Do(newReq)
-
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
-	// defer resp.Body.Close()
-
-	// recievedBody, err := ioutil.ReadAll(resp.Body)
-	// if err != nil {
-	// 	http.Error(w, "Bad response from Github", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// w.Write(recievedBody)
 }
