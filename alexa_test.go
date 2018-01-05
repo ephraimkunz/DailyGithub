@@ -16,6 +16,7 @@ func Test_requiresAccessToken(t *testing.T) {
 		{"Require3", args{"assigned_issues_intent"}, true},
 		{"NotRequired", args{"trending_repos_intent"}, false},
 		{"NotRequired2", args{"fake_intent"}, false},
+		{"NotRequired3", args{""}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
