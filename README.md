@@ -9,6 +9,12 @@ Amazon Alexa skill is [here](https://www.amazon.com/dp/B078LHPJWM/ref=sr_1_13?s=
 
 Google Assistant skill is [here](https://assistant.google.com/services/a/uid/000000c1a6473f2d?hl=en).
 
+## Things to ask
+* "Get issues assigned to me."  "My assigned issues."
+* "Get my notifications." "Read notifications."
+* "Profile summary." "Github profile summary."
+* "Trending repos." "Top repos in Golang." "Top 6 trending repos in Javascript."
+
 ## Testing
 Run `go test` inside the directory root.
 
