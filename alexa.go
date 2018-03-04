@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,7 +10,16 @@ import (
 	"net/http/httputil"
 	"strconv"
 	"strings"
+	"time"
+
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/urlfetch"
 )
+
+func init() {
+	http.HandleFunc("/alexa", alexaHandler)
+	http.HandleFunc("/token", alexaTokenProxyHandler)
+}
 
 const (
 	// Required in json response
@@ -34,13 +44,10 @@ const (
 	AuthRequiredText = "<speak>This task requires linking your Github account to this skill.</speak>"
 )
 
-// Per Golang docs, create once and reuse across multiple goroutines
-var client = &http.Client{}
-
 // Make a string have the buildFulfillment method
 type AlexaStringResponse string
 
-func (strResp *AlexaStringResponse) buildFulfillment() *FulfillmentResp {
+func (strResp *AlexaStringResponse) buildFulfillment(ctx context.Context) *FulfillmentResp {
 	str := string(*strResp)
 	fr := &FulfillmentResp{str, str}
 	return fr
@@ -115,13 +122,17 @@ func requiresAccessToken(name string) bool {
 }
 
 func alexaHandler(w http.ResponseWriter, r *http.Request) {
-	validateRequest(w, r)
+	ctx := appengine.NewContext(r)
+
+	validateRequest(ctx, w, r)
 	switch r.Method {
 	case http.MethodPost:
-		debug(httputil.DumpRequest(r, true))
+		b, err := httputil.DumpRequest(r, true)
+		debug(ctx, b, err)
+
 		decoder := json.NewDecoder(r.Body)
 		alexaReq := &AlexaRequest{}
-		err := decoder.Decode(alexaReq)
+		err = decoder.Decode(alexaReq)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -160,17 +171,19 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 
 		switch alexaReq.Request.Intent.Name {
 		case SummaryIntent:
-			builder, err = getProfileSummary(alexaReq.Session.User.AccessToken)
+			builder, err = getProfileSummary(ctx, alexaReq.Session.User.AccessToken)
 		case TrendingReposIntent:
+			ctxWithDeadline, _ := context.WithTimeout(ctx, 10*time.Second) // This call sometimes takes a while
+			client := urlfetch.Client(ctxWithDeadline)
 			if i, err := strconv.Atoi(alexaReq.Request.Intent.Slots.Number.Value); err == nil && i != 0 {
-				builder, err = getTrending(&i, extractLang(alexaReq.Request.Intent.Slots.Lang.Value))
+				builder, err = getTrending(ctx, client, &i, extractLang(client, alexaReq.Request.Intent.Slots.Lang.Value))
 			} else {
-				builder, err = getTrending(nil, extractLang(alexaReq.Request.Intent.Slots.Lang.Value))
+				builder, err = getTrending(ctx, client, nil, extractLang(client, alexaReq.Request.Intent.Slots.Lang.Value))
 			}
 		case NotificationsIntent:
-			builder, err = getNotifications(alexaReq.Session.User.AccessToken)
+			builder, err = getNotifications(ctx, alexaReq.Session.User.AccessToken)
 		case AssignedIssuesIntent:
-			builder, err = getAssignedIssues(alexaReq.Session.User.AccessToken)
+			builder, err = getAssignedIssues(ctx, alexaReq.Session.User.AccessToken)
 		case AlexaHelpIntent:
 			resp := AlexaStringResponse(HelpText)
 			builder, err = &resp, nil
@@ -187,7 +200,7 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		str := builder.buildFulfillment().Speech
+		str := builder.buildFulfillment(ctx).Speech
 		str = strings.Replace(str, "&", "and", -1) // Alexa won't read ssml with '&' in it
 
 		alexaResp := NewAlexaResponse(str)
@@ -218,7 +231,10 @@ func alexaHandler(w http.ResponseWriter, r *http.Request) {
 // Google makes us use this proxy, but for a different reason. They always pass credentials in the request body.
 // They just want us to own the /token endpoint, so we proxy them to Github too.
 func alexaTokenProxyHandler(w http.ResponseWriter, r *http.Request) {
-	debug(httputil.DumpRequest(r, true))
+	ctx := appengine.NewContext(r)
+
+	b, err := httputil.DumpRequest(r, true)
+	debug(ctx, b, err)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -229,6 +245,7 @@ func alexaTokenProxyHandler(w http.ResponseWriter, r *http.Request) {
 	newReq, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBuffer(body))
 	newReq.Header.Set("Accept", "application/json")
 
+	client := urlfetch.Client(ctx)
 	resp, err := client.Do(newReq)
 
 	if err != nil {

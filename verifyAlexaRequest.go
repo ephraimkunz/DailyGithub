@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -15,30 +16,31 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"google.golang.org/appengine/log"
 )
 
-func HTTPError(w http.ResponseWriter, logMsg string, err string, errCode int) {
+func HTTPError(ctx context.Context, w http.ResponseWriter, logMsg string, err string, errCode int) {
 	if logMsg != "" {
-		log.Println(logMsg)
+		log.Debugf(ctx, logMsg)
 	}
 
 	http.Error(w, err, errCode)
 }
 
 // Run all mandatory Amazon security checks on the request.
-func validateRequest(w http.ResponseWriter, r *http.Request) {
+func validateRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	// Check for debug bypass flag
 	devFlag := r.URL.Query().Get("_dev")
 
 	isDev := devFlag != ""
 
 	if !isDev {
-		isRequestValid := IsValidAlexaRequest(w, r)
+		isRequestValid := IsValidAlexaRequest(ctx, w, r)
 		if !isRequestValid {
 			return
 		}
@@ -49,39 +51,39 @@ func validateRequest(w http.ResponseWriter, r *http.Request) {
 // the Alexa service. If an error occurs during the validation process, an http.Error will be written to the provided http.ResponseWriter.
 // The required steps for request validation can be found on this page:
 // https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/developing-an-alexa-skill-as-a-web-service#hosting-a-custom-skill-as-a-web-service
-func IsValidAlexaRequest(w http.ResponseWriter, r *http.Request) bool {
+func IsValidAlexaRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) bool {
 	certURL := r.Header.Get("SignatureCertChainUrl")
 
 	// Verify certificate URL
 	if !verifyCertURL(certURL) {
 
-		HTTPError(w, "Invalid cert URL: "+certURL, "Not Authorized", 401)
+		HTTPError(ctx, w, "Invalid cert URL: "+certURL, "Not Authorized", 401)
 		return false
 	}
 
 	// Fetch certificate data
 	certContents, err := readCert(certURL)
 	if err != nil {
-		HTTPError(w, err.Error(), "Not Authorized", 401)
+		HTTPError(ctx, w, err.Error(), "Not Authorized", 401)
 		return false
 	}
 
 	// Decode certificate data
 	block, _ := pem.Decode(certContents)
 	if block == nil {
-		HTTPError(w, "Failed to parse certificate PEM.", "Not Authorized", 401)
+		HTTPError(ctx, w, "Failed to parse certificate PEM.", "Not Authorized", 401)
 		return false
 	}
 
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		HTTPError(w, err.Error(), "Not Authorized", 401)
+		HTTPError(ctx, w, err.Error(), "Not Authorized", 401)
 		return false
 	}
 
 	// Check the certificate date
 	if time.Now().Unix() < cert.NotBefore.Unix() || time.Now().Unix() > cert.NotAfter.Unix() {
-		HTTPError(w, "Amazon certificate expired.", "Not Authorized", 401)
+		HTTPError(ctx, w, "Amazon certificate expired.", "Not Authorized", 401)
 		return false
 	}
 
@@ -94,7 +96,7 @@ func IsValidAlexaRequest(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	if !foundName {
-		HTTPError(w, "Amazon certificate invalid.", "Not Authorized", 401)
+		HTTPError(ctx, w, "Amazon certificate invalid.", "Not Authorized", 401)
 		return false
 	}
 
@@ -107,15 +109,14 @@ func IsValidAlexaRequest(w http.ResponseWriter, r *http.Request) bool {
 	hash := sha1.New()
 	_, err = io.Copy(hash, io.TeeReader(r.Body, &bodyBuf))
 	if err != nil {
-		HTTPError(w, err.Error(), "Internal Error", 500)
+		HTTPError(ctx, w, err.Error(), "Internal Error", 500)
 		return false
 	}
-	//log.Println(bodyBuf.String())
 	r.Body = ioutil.NopCloser(&bodyBuf)
 
 	err = rsa.VerifyPKCS1v15(publicKey.(*rsa.PublicKey), crypto.SHA1, hash.Sum(nil), encryptedSig)
 	if err != nil {
-		HTTPError(w, "Signature match failed.", "Not Authorized", 401)
+		HTTPError(ctx, w, "Signature match failed.", "Not Authorized", 401)
 		return false
 	}
 

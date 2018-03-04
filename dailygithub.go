@@ -3,14 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
-	_ "net/http/pprof"
 	"strings"
 
-	"github.com/andygrunwald/go-trending"
+	_ "net/http/pprof"
+
+	"github.com/ephraimkunz/go-trending"
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/urlfetch"
 )
 
 const (
@@ -69,7 +71,7 @@ type Trending struct {
 }
 
 type FulfillmentBuilder interface {
-	buildFulfillment() *FulfillmentResp
+	buildFulfillment(ctx context.Context) *FulfillmentResp
 }
 
 func minInt(x, y int) int {
@@ -79,8 +81,8 @@ func minInt(x, y int) int {
 	return y
 }
 
-func extractLang(lang string) string {
-	trend := trending.NewTrending()
+func extractLang(client *http.Client, lang string) string {
+	trend := trending.NewTrendingWithClient(client)
 	langs, err := trend.GetLanguages()
 	if err != nil {
 		return ""
@@ -99,17 +101,17 @@ func extractLang(lang string) string {
 	return ""
 }
 
-func debug(data []byte, err error) {
+func debug(ctx context.Context, data []byte, err error) {
 	if err == nil {
-		log.Println("Request", string(data))
+		log.Debugf(ctx, "Request", string(data))
 	} else {
-		log.Println(err)
+		log.Debugf(ctx, err.Error())
 	}
 }
 
 // Count may be nil if the user didn't specify how many. Give them the default value.
-func getTrending(count *int, lang string) (FulfillmentBuilder, error) {
-	trend := trending.NewTrending()
+func getTrending(ctx context.Context, client *http.Client, count *int, lang string) (FulfillmentBuilder, error) {
+	trend := trending.NewTrendingWithClient(client)
 	projects, err := trend.GetProjects(trending.TimeToday, lang)
 	if err != nil {
 		return nil, err
@@ -140,7 +142,7 @@ func getTrending(count *int, lang string) (FulfillmentBuilder, error) {
 	return &Trending{projectText, projectSpeech}, nil
 }
 
-func (sum *ProfileSummary) buildFulfillment() *FulfillmentResp {
+func (sum *ProfileSummary) buildFulfillment(ctx context.Context) *FulfillmentResp {
 	summary := fmt.Sprintf(
 		"Hello %s. You currently have %d public repos, "+
 			"%d private repos, and you own %d of these private repos."+
@@ -148,17 +150,17 @@ func (sum *ProfileSummary) buildFulfillment() *FulfillmentResp {
 		sum.user.GetName(), sum.user.GetPublicRepos(), sum.user.GetTotalPrivateRepos(),
 		sum.user.GetOwnedPrivateRepos(), sum.user.GetFollowers(), sum.user.GetFollowing())
 	resp := &FulfillmentResp{Speech: "<speak>" + summary + "</speak>", DisplayText: summary}
-	log.Println("Built fulfillment with string ", summary)
+	log.Debugf(ctx, "Built fulfillment with string ", summary)
 	return resp
 }
 
-func (trending *Trending) buildFulfillment() *FulfillmentResp {
+func (trending *Trending) buildFulfillment(ctx context.Context) *FulfillmentResp {
 	resp := &FulfillmentResp{Speech: "<speak>" + trending.speech + "</speak>", DisplayText: trending.text}
-	log.Println("Built fulfillment with string ", trending.speech)
+	log.Debugf(ctx, "Built fulfillment with string ", trending.speech)
 	return resp
 }
 
-func (not *GithubNotifications) buildFulfillment() *FulfillmentResp {
+func (not *GithubNotifications) buildFulfillment(ctx context.Context) *FulfillmentResp {
 	var text, speech string
 	if len([]*github.Notification(*not)) > 0 {
 		speech = "<speak><p>Here are your unread notifications:</p>"
@@ -173,7 +175,7 @@ func (not *GithubNotifications) buildFulfillment() *FulfillmentResp {
 	return &FulfillmentResp{speech + "</speak>", text}
 }
 
-func (iss *GithubIssues) buildFulfillment() *FulfillmentResp {
+func (iss *GithubIssues) buildFulfillment(ctx context.Context) *FulfillmentResp {
 	var text, speech string
 	if len([]*github.Issue(*iss)) > 0 {
 		speech = fmt.Sprintf("<speak><p>Here are the open issues assigned to you:</p>")
@@ -188,8 +190,8 @@ func (iss *GithubIssues) buildFulfillment() *FulfillmentResp {
 	return &FulfillmentResp{speech + "</speak>", text}
 }
 
-func getNotifications(accessToken string) (FulfillmentBuilder, error) {
-	client, ctx := createGithubClient(accessToken)
+func getNotifications(ctx context.Context, accessToken string) (FulfillmentBuilder, error) {
+	client := createGithubClient(ctx, accessToken)
 	notifications, _, err := client.Activity.ListNotifications(ctx, nil)
 
 	if err != nil {
@@ -200,8 +202,8 @@ func getNotifications(accessToken string) (FulfillmentBuilder, error) {
 	return &ghNot, nil
 }
 
-func getAssignedIssues(accessToken string) (FulfillmentBuilder, error) {
-	client, ctx := createGithubClient(accessToken)
+func getAssignedIssues(ctx context.Context, accessToken string) (FulfillmentBuilder, error) {
+	client := createGithubClient(ctx, accessToken)
 	issues, _, err := client.Issues.List(ctx, true, nil)
 
 	if err != nil {
@@ -212,8 +214,8 @@ func getAssignedIssues(accessToken string) (FulfillmentBuilder, error) {
 	return &iss, nil
 }
 
-func getProfileSummary(accessToken string) (FulfillmentBuilder, error) {
-	client, ctx := createGithubClient(accessToken)
+func getProfileSummary(ctx context.Context, accessToken string) (FulfillmentBuilder, error) {
+	client := createGithubClient(ctx, accessToken)
 	user, _, err := client.Users.Get(ctx, "") // Get authenticated user
 
 	if err != nil {
@@ -225,18 +227,14 @@ func getProfileSummary(accessToken string) (FulfillmentBuilder, error) {
 	return summary, nil
 }
 
-func createGithubClient(accessToken string) (*github.Client, context.Context) {
-	ctx := context.Background()
+func createGithubClient(ctx context.Context, accessToken string) *github.Client {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: accessToken})
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-	return client, ctx
-}
-
-func main() {
-	http.HandleFunc("/", assistantHandler)
-	http.HandleFunc("/authorize", assistantAuth)
-	http.HandleFunc("/alexa", alexaHandler)
-	http.HandleFunc("/token", alexaTokenProxyHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	authClient := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: oauth2.ReuseTokenSource(nil, ts),
+			Base:   &urlfetch.Transport{Context: ctx},
+		},
+	}
+	client := github.NewClient(authClient)
+	return client
 }
