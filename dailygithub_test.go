@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	_ "net/http/pprof"
 	"testing"
 )
@@ -22,7 +23,7 @@ func Test_extractLang(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := extractLang(tt.args.lang); got != tt.want {
+			if got := extractLang(http.DefaultClient, tt.args.lang); got != tt.want {
 				t.Errorf("extractLang() = %v, want %v", got, tt.want)
 			}
 		})
