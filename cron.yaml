@@ -1,0 +1,4 @@
+cron:
+- description: "hourly trending cache refresh"
+  url: /tasks/refreshTrendingCache
+  schedule: every 1 hours

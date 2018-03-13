@@ -111,8 +111,7 @@ func debug(ctx context.Context, data []byte, err error) {
 
 // Count may be nil if the user didn't specify how many. Give them the default value.
 func getTrending(ctx context.Context, client *http.Client, count *int, lang string) (FulfillmentBuilder, error) {
-	trend := trending.NewTrendingWithClient(client)
-	projects, err := trend.GetProjects(trending.TimeToday, lang)
+	projects, err := get(ctx, lang)
 	if err != nil {
 		return nil, err
 	}
@@ -126,12 +125,12 @@ func getTrending(ctx context.Context, client *http.Client, count *int, lang stri
 	}
 
 	if lang != "" {
-		projectSpeech = fmt.Sprintf("<p>Here are the top %d trending repositories for %s:</p>", minInt(len(projects), maxTrending), lang)
+		projectSpeech = fmt.Sprintf("<p>Here are the top %d trending repositories for %s:</p>", minInt(len(projects.Data), maxTrending), lang)
 	} else {
-		projectSpeech = fmt.Sprintf("<p>Here are the top %d trending repositories:</p>", minInt(len(projects), maxTrending))
+		projectSpeech = fmt.Sprintf("<p>Here are the top %d trending repositories:</p>", minInt(len(projects.Data), maxTrending))
 	}
 
-	for index, project := range projects {
+	for index, project := range projects.Data {
 		if index >= maxTrending {
 			break
 		}

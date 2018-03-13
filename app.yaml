@@ -1,5 +1,7 @@
 runtime: go
 api_version: go1
+inbound_services:
+- warmup # Warm up Trending cache on deploy
 
 handlers:
 - url: /.*
