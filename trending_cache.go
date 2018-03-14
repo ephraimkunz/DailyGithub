@@ -27,7 +27,6 @@ const allLanguagesKey = "all" // Use to store in Cloud Datastore
 
 func init() {
 	http.HandleFunc("/tasks/refreshTrendingCache", refreshTrendingCache)
-	http.HandleFunc("/_ah/warmup", warmup)
 	rand.Seed(time.Now().UnixNano())
 }
 
