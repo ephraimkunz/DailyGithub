@@ -14,12 +14,15 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"google.golang.org/appengine/urlfetch"
 
 	"google.golang.org/appengine/log"
 )
@@ -62,7 +65,7 @@ func IsValidAlexaRequest(ctx context.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	// Fetch certificate data
-	certContents, err := readCert(certURL)
+	certContents, err := readCert(ctx, certURL)
 	if err != nil {
 		HTTPError(ctx, w, err.Error(), "Not Authorized", 401)
 		return false
@@ -123,8 +126,16 @@ func IsValidAlexaRequest(ctx context.Context, w http.ResponseWriter, r *http.Req
 	return true
 }
 
-func readCert(certURL string) ([]byte, error) {
-	cert, err := http.Get(certURL)
+func readCert(ctx context.Context, certURL string) ([]byte, error) {
+	client := urlfetch.Client(ctx)
+	request, err := http.NewRequest("GET", certURL, nil)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create GET request for certURL: %s", certURL)
+	}
+
+	cert, err := client.Do(request)
+
 	if err != nil {
 		return nil, errors.New("could not download Amazon cert file")
 	}

@@ -103,7 +103,7 @@ func extractLang(client *http.Client, lang string) string {
 
 func debug(ctx context.Context, data []byte, err error) {
 	if err == nil {
-		log.Debugf(ctx, "Request", string(data))
+		log.Debugf(ctx, "Request: %s", string(data))
 	} else {
 		log.Debugf(ctx, err.Error())
 	}
@@ -149,13 +149,13 @@ func (sum *ProfileSummary) buildFulfillment(ctx context.Context) *FulfillmentRes
 		sum.user.GetName(), sum.user.GetPublicRepos(), sum.user.GetTotalPrivateRepos(),
 		sum.user.GetOwnedPrivateRepos(), sum.user.GetFollowers(), sum.user.GetFollowing())
 	resp := &FulfillmentResp{Speech: "<speak>" + summary + "</speak>", DisplayText: summary}
-	log.Debugf(ctx, "Built fulfillment with string ", summary)
+	log.Debugf(ctx, "Built fulfillment with string: %s", summary)
 	return resp
 }
 
 func (trending *Trending) buildFulfillment(ctx context.Context) *FulfillmentResp {
 	resp := &FulfillmentResp{Speech: "<speak>" + trending.speech + "</speak>", DisplayText: trending.text}
-	log.Debugf(ctx, "Built fulfillment with string ", trending.speech)
+	log.Debugf(ctx, "Built fulfillment with string: %s", trending.speech)
 	return resp
 }
 
